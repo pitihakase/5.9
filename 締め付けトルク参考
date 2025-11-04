@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ボルト締付トルク計算｜簡易 & m–y法</title>
+<style>
+  :root{--bg:#0b1020;--ink:#eaf2ff;--sub:#b7c7df;--line:rgba(255,255,255,.15);--acc:#86e0ff}
+  body{margin:0;background:#0b1020;color:var(--ink);font-family:system-ui,"Noto Sans JP",Meiryo,sans-serif}
+  main{max-width:960px;margin:24px auto;padding:0 16px}
+  h1{margin:0 0 10px}
+  .card{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0}
+  label{display:block;margin:8px 0 4px}
+  input{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:rgba(0,0,0,.25);color:var(--ink)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  button{padding:10px 16px;border-radius:10px;border:0;background:linear-gradient(180deg,#c8f1ff,#7fd9ff);color:#052b3b;font-weight:800}
+  .result{font-weight:800;font-size:20px}
+  small{color:var(--sub)}
+</style>
+<main>
+  <h1>ボルト締付トルク計算</h1>
+  <p class="card">単純式 <b>T=K×F×d</b> と、<b>m–y法</b>（ガスケットからFを算出）を内蔵。単位は <b>T[N·m]</b>、<b>F[N]</b>、<b>d[m]</b>、<b>P[MPa]</b>。</p>
+
+  <!-- 1) 超かんたん：Fを直接入れる -->
+  <section class="card">
+    <h2>① かんたん計算（Fを直接入力）</h2>
+    <div class="grid">
+      <div><label>トルク係数 K（摩擦）<small> 乾燥0.20 / 油0.16 / MoS₂ 0.11 目安</small></label>
+        <input id="K" type="number" step="0.01" value="0.16"></div>
+      <div><label>ボルト1本あたり軸力 F [N]</label>
+        <input id="F" type="number" step="1" value="30000"></div>
+      <div><label>ボルト径 d [m] <small>例：M16→0.016</small></label>
+        <input id="d" type="number" step="0.001" value="0.016"></div>
+    </div>
+    <p class="result">T = <span id="T1">—</span> N·m</p>
+    <button onclick="calcSimple()">計算</button>
+  </section>
+
+  <!-- 2) m–y 法：ガスケットからFを出す -->
+  <section class="card">
+    <h2>② m–y法（ガスケットから算出）</h2>
+    <div class="grid">
+      <div><label>m（ガスケット係数）</label><input id="m" type="number" step="0.01" value="3.0"></div>
+      <div><label>y（最小設計締付圧）[N/mm²]</label><input id="y" type="number" step="0.1" value="68.9"></div>
+      <div><label>P（内圧）[MPa]</label><input id="P" type="number" step="0.01" value="1.0"></div>
+      <div><label>b（有効幅）[mm]</label><input id="b" type="number" step="0.1" value="5.0"></div>
+      <div><label>G（平均径）[mm]</label><input id="G" type="number" step="0.1" value="150.0"></div>
+      <div><label>ボルト本数 n</label><input id="n" type="number" step="1" value="8"></div>
+      <div><label>トルク係数 K</label><input id="K2" type="number" step="0.01" value="0.16"></div>
+      <div><label>ボルト径 d [m]</label><input id="d2" type="number" step="0.001" value="0.016"></div>
+    </div>
+    <p><small>式：W = π·b·G·y + 2·π·b·G·m·P（単位整合で <b>b,G[mm], y[N/mm²], P[MPa]</b> のまま計算）</small></p>
+    <p class="result">1本あたり軸力 F = <span id="F2">—</span> N ／ T = <span id="T2">—</span> N·m</p>
+    <button onclick="calcMy()">計算</button>
+  </section>
+
+  <p class="card"><b>注意</b>：K（摩擦）は状態で大きく変わります。最終値は現場標準やメーカー推奨に合わせてください。ガスケット実効幅bやGは仕様に従って設定してね。</p>
+</main>
+
+<script>
+function fmt(x){ return (isFinite(x)? Math.round(x*100)/100 : NaN).toLocaleString(); }
+
+function calcSimple(){
+  const K = parseFloat(K_id.value);
+  const F = parseFloat(F.value);
+  const d = parseFloat(d.value);
+  const T = K * F * d;
+  document.getElementById('T1').textContent = fmt(T);
+}
+// DOMのid参照（ Safari 対策で個別取得 ）
+const K_id = document.getElementById('K');
+
+function calcMy(){
+  const m = parseFloat(document.getElementById('m').value);
+  const y = parseFloat(document.getElementById('y').value);     // N/mm²
+  const P = parseFloat(document.getElementById('P').value);     // MPa = N/mm²
+  const b = parseFloat(document.getElementById('b').value);     // mm
+  const G = parseFloat(document.getElementById('G').value);     // mm
+  const n = parseInt(document.getElementById('n').value,10);
+  const K2= parseFloat(document.getElementById('K2').value);
+  const d2= parseFloat(document.getElementById('d2').value);
+
+  // W = π*b*G*y + 2*π*b*G*m*P   （単位：N）
+  const W_seat = Math.PI * b * G * y;
+  const W_op   = 2 * Math.PI * b * G * m * P;
+  const W = W_seat + W_op;
+  const F = W / n;
+  const T = K2 * F * d2;
+
+  document.getElementById('F2').textContent = fmt(F);
+  document.getElementById('T2').textContent = fmt(T);
+}
+</script>
