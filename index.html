@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ぴち博士ラボ｜インデックス</title>
+<style>
+  :root{ --bg:#0b1020; --ink:#eaf2ff; --sub:#b7c7df; --line:rgba(255,255,255,.15); --acc:#86e0ff }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1000px 600px at 70% -10%, #12203a 0%, var(--bg) 60%),
+                 radial-gradient(1000px 600px at -10% 120%, #0c1422 0%, var(--bg) 60%);
+       color:var(--ink);font-family:system-ui, -apple-system, Segoe UI, Noto Sans JP, Meiryo, sans-serif}
+  header{padding:28px 16px 12px;text-align:center}
+  h1{margin:0 0 6px;font-size:24px}
+  .lead{margin:0;color:var(--sub);font-size:13px}
+  main{max-width:980px;margin:16px auto 40px;padding:0 16px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:16px}
+  a.card{display:block;padding:16px;border-radius:14px;text-decoration:none;color:#052b3b;
+         background:linear-gradient(180deg,#c8f1ff,#7fd9ff);box-shadow:0 8px 24px rgba(134,224,255,.35);
+         font-weight:800}
+  .note{margin-top:18px;color:var(--sub);font-size:13px}
+  footer{padding:18px 16px;border-top:1px solid var(--line);text-align:center;color:var(--sub);font-size:12px}
+  @media print{ body{background:#fff;color:#000} a.card{box-shadow:none} }
+</style>
+</head>
+<body>
+<header>
+  <h1>ぴち博士ラボ – 入口</h1>
+  <p class="lead">作ったページへのリンク集。必要に応じて増やしていけます。</p>
+</header>
+<main>
+  <div class="grid">
+    <a class="card" href="5.9スコアボード.html">🎱 5/9 ルール スコアボード</a>
+    <!-- ここにページを追加していく例：
+    <a class="card" href="kirakira_resume_csv.html">✨ キラキラ履歴書（CSV読込）</a>
+    <a class="card" href="memory_game.html">🃏 神経衰弱ゲーム</a>
+    -->
+  </div>
+  <p class="note">GitHub Pages で公開する場合は、この <code>index.html</code> をリポジトリのトップ階層に置いてください。</p>
+</main>
+<footer>© ぴち博士</footer>
+</body>
+</html>
