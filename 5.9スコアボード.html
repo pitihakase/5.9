@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ナインボール特別ルール｜得点表 v3（ゼロサム・4人・全期間スコア大表示）</title>
+<style>
+  :root{
+    --bg:#0b0f17; --card:#111827; --ink:#e9f2ff; --sub:#b7c7df; --line:rgba(255,255,255,.08);
+    --acc:#ffd54f; --blue:#90caf9; --mint:#98ffcc; --danger:#ff7f98; --neg:#ff8aa3;
+  }
+  *{box-sizing:border-box}
+  body{ margin:0; background:radial-gradient(1000px 600px at 70% -10%, #12203a 0%, var(--bg) 60%),
+                 radial-gradient(1000px 600px at -10% 120%, #0c1422 0%, var(--bg) 60%);
+        color:var(--ink); font-family:"Segoe UI","Hiragino Kaku Gothic ProN","Meiryo",system-ui,sans-serif;}
+  header{ padding:18px 14px 6px; text-align:center }
+  h1{ margin:0; font-size:24px; color:var(--acc) }
+  .lead{ margin:6px 0 0; color:var(--sub); font-size:13px }
+  .wrap{ max-width:1200px; margin:10px auto 24px; padding:0 14px; display:grid; gap:12px;
+         grid-template-columns: 1fr; }
+  .card{ background:linear-gradient(180deg, var(--card), #0f1522); border:1px solid var(--line);
+         border-radius:14px; padding:12px; box-shadow:0 8px 24px rgba(0,0,0,.35); }
+  /* ===== All-time Big Board ===== */
+  .bigboard{ display:flex; flex-direction:column; gap:10px; align-items:center }
+  .bigboard h2{ margin:0; color:var(--blue); font-size:18px }
+  .rankgrid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; width:100% }
+  .rankcard{ background:#0e1624; border:1px solid var(--line); border-radius:14px; padding:12px;
+             display:flex; flex-direction:column; gap:4px; align-items:center; position:relative; overflow:hidden }
+  .rankcard .name{ font-weight:800; font-size:20px }
+  .rankcard .score{ font-size:40px; font-weight:800; letter-spacing:1px; }
+  .pos{ color:var(--mint); text-shadow:0 0 16px rgba(152,255,204,.35) }
+  .neg{ color:var(--neg);  text-shadow:0 0 16px rgba(255,138,163,.25) }
+  .rankbadge{ position:absolute; top:8px; left:8px; background:#122235; border:1px solid var(--line);
+              padding:2px 8px; border-radius:999px; color:#b7d4ff; font-size:12px }
+  .small{ font-size:11px; color:#9fb0c8 }
+  /* ===== Controls & Panels ===== */
+  .grid-out{ display:grid; grid-template-columns: 1.1fr .9fr; gap:12px }
+  @media (max-width:1100px){ .grid-out{ grid-template-columns:1fr } }
+  .grid4{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px }
+  .panel{ background:#0e1624; border:1px solid var(--line); border-radius:12px; padding:10px; display:flex; flex-direction:column; gap:8px }
+  .panel input{ width:100%; border:none; background:transparent; color:var(--ink);
+                font-weight:700; font-size:14px; padding:4px 6px; border-bottom:1px dashed var(--line) }
+  .score{ font-size:28px; color:var(--mint); text-shadow:0 0 12px rgba(152,255,204,.25); }
+  .controls{ display:grid; grid-template-columns:repeat(2,1fr); gap:6px }
+  button{ padding:8px 10px; border-radius:10px; border:1px solid var(--line); background:#12243a; color:var(--ink); cursor:pointer; font-weight:600 }
+  button:hover{ background:#193453 }
+  .danger{ background:#3a1420; border-color:#4a1b29 } .danger:hover{ background:#4e1b28 }
+  .muted{ color:#9fb0c8; font-size:12px }
+  .plist{ font-size:12px; color:#cfe0ff; background:#0b1320; border:1px solid var(--line); border-radius:8px; padding:6px; max-height:120px; overflow:auto }
+  .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+  .toolbar{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px }
+  .badge{ display:inline-block; padding:2px 8px; border-radius:999px; background:#122235; color:#b7d4ff; font-size:12px; border:1px solid var(--line) }
+  .right{ margin-left:auto }
+  .totals{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px }
+  .totals .box{ background:#0e1624; border:1px solid var(--line); border-radius:10px; padding:8px; text-align:center }
+  .box strong{ color:var(--acc) }
+  .warn{ color:#ffb3c1; font-size:12px; display:none }
+</style>
+</head>
+<body>
+<header>
+  <h1>ナインボール特別ルール｜得点表 v3（4人・ゼロサム）</h1>
+  <p class="lead">ルール：5=1点, 9=2点。コーナー=×1、サイド=×2。得点処理は完全ゼロサム（自分は払わない）。</p>
+</header>
+
+<div class="wrap">
+  <!-- ===== All-time Big Board ===== -->
+  <div class="card bigboard">
+    <h2>全期間スコア（ゲーム確定までの通算）</h2>
+    <div class="small">※「ゲームを確定」で更新。名前が同一のプレイヤーを通算します。</div>
+    <div id="alltime" class="rankgrid"></div>
+  </div>
+
+  <div class="grid-out">
+    <div class="card">
+      <h2>スコア & 操作</h2>
+      <div class="grid4" id="players"><!-- panels --></div>
+
+      <div class="toolbar">
+        <span class="badge">ゼロサム検証：合計 <span id="sumAll">0</span> 点</span>
+        <span id="warn" class="warn">※合計が0以外 → ルール設定の不整合</span>
+        <button id="undo" class="danger">直前を取り消し</button>
+        <button id="reset">このゲームをリセット</button>
+        <button id="endgame" class="right">ゲームを確定 → アーカイブ保存</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>ゲームアーカイブ</h2>
+      <div class="toolbar">
+        <button id="exportCSV">履歴をCSVで保存</button>
+        <button id="print">印刷（PDF）</button>
+      </div>
+      <div class="totals" id="totals"></div>
+      <div class="small" id="gamesHint">アーカイブに保存されたゲームはここに合計が並びます。</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ====== State ======
+const PN = 4;
+const names = [null, 'P1','P2','P3','P4'];
+const scores = Array(PN+1).fill(0);
+const logs = Array(PN+1).fill(0).map(()=>[]); // per-player shot logs (this game)
+let history = [];  // linear history for undo
+let games = [];    // archived games
+let gameId = 1;
+
+// ====== UI builders ======
+function panelHTML(i){
+  return `<div class="panel" id="panel${i}">
+    <input id="n${i}" value="P${i}">
+    <div class="row">
+      <div class="score" id="s${i}">0</div>
+      <div class="muted">このゲーム合計</div>
+    </div>
+    <div class="controls">
+      <button data-p="${i}" data-ball="5" data-pocket="C">5 Corner ×1</button>
+      <button data-p="${i}" data-ball="5" data-pocket="S">5 Side ×2</button>
+      <button data-p="${i}" data-ball="9" data-pocket="C">9 Corner ×1</button>
+      <button data-p="${i}" data-ball="9" data-pocket="S">9 Side ×2</button>
+    </div>
+    <div class="plist" id="list${i}">（ここに${'P'+i}の履歴）</div>
+  </div>`;
+}
+
+function init(){
+  // build player panels
+  const wrap = document.getElementById('players');
+  wrap.innerHTML = '';
+  for(let i=1;i<=PN;i++){
+    wrap.insertAdjacentHTML('beforeend', panelHTML(i));
+    const inp = document.getElementById('n'+i);
+    inp.addEventListener('input', ()=>{ names[i]=inp.value||('P'+i); renderLists(); renderGames(); renderAllTime(); });
+    names[i]=inp.value;
+  }
+  // wire control buttons
+  document.querySelectorAll('.controls button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const p = parseInt(btn.dataset.p,10);
+      const ball = parseInt(btn.dataset.ball,10);
+      const pocket = btn.dataset.pocket; // C or S
+      addShot(p, ball, pocket);
+    });
+  });
+  renderAll();
+}
+
+// ====== Logic ======
+function basePoint(ball){ return ball===5 ? 1 : 2; }
+function mult(pocket){ return pocket==='S' ? 2 : 1; }
+
+function addShot(p, ball, pocket){
+  const b = basePoint(ball);
+  const m = mult(pocket);
+  const perOpponent = b*m;
+  const opponents = [];
+  for(let i=1;i<=PN;i++){
+    if(i===p) continue;
+    scores[i] -= perOpponent;
+    opponents.push(i);
+  }
+  const gain = perOpponent * opponents.length; // +3*perOpponent
+  scores[p] += gain;
+
+  const entry = {
+    t: new Date().toLocaleTimeString(),
+    p, ball, pocket, perOpponent, gain,
+    opp: opponents.slice()
+  };
+  history.push(entry);
+  logs[p].push(entry);
+  renderAll();
+}
+
+function undo(){
+  const e = history.pop();
+  if(!e) return;
+  // revert
+  scores[e.p] -= e.gain;
+  e.opp.forEach(i=> scores[i] += e.perOpponent);
+  // remove from per-player log (last matching reference)
+  const arr = logs[e.p];
+  for(let k=arr.length-1;k>=0;k--){
+    if(arr[k]===e){ arr.splice(k,1); break; }
+  }
+  renderAll();
+}
+
+function resetGame(){
+  for(let i=1;i<=PN;i++){ scores[i]=0; logs[i]=[]; }
+  history = [];
+  renderAll();
+}
+
+function endGame(){
+  const totals = [0].concat(scores.slice(1));
+  const nameCopy = [null].concat(names.slice(1));
+  const shotCopy = history.map(e=>({...e, name:nameCopy[e.p]}));
+  games.push({id: gameId++, time: new Date().toLocaleString(), names:nameCopy, totals, shots:shotCopy});
+  resetGame();
+  renderGames();
+  renderAllTime();
+}
+
+// ====== Export / Print ======
+function exportCSV(){
+  const headers = ['game_id','time','player','ball','pocket','per_opponent','gain','opponents'];
+  let csv = headers.join(',')+'\n';
+  games.forEach(g=>{
+    g.shots.forEach(e=>{
+      csv += [g.id, `"${g.time}"`, `"${e.name}"`, e.ball, e.pocket, e.perOpponent, e.gain, `"${e.opp.map(i=>g.names[i]).join('|')}"`].join(',')+'\n';
+    });
+  });
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'nineball_zero_sum_history.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// ====== Renderers ======
+function sumAll(){ return scores.slice(1).reduce((a,b)=>a+b,0); }
+
+function renderAll(){
+  // scores
+  for(let i=1;i<=PN;i++){ document.getElementById('s'+i).textContent = scores[i]; }
+  // per-player lists
+  renderLists();
+  // zero-sum indicator
+  const sum = sumAll();
+  document.getElementById('sumAll').textContent = sum;
+  document.getElementById('warn').style.display = (sum===0)?'none':'inline';
+  // archive panel (for current names reflected)
+  renderGames();
+}
+
+function renderLists(){
+  for(let i=1;i<=PN;i++){
+    const list = document.getElementById('list'+i);
+    if(!logs[i].length){ list.textContent = `（ここに${names[i]}の履歴）`; continue; }
+    list.innerHTML = logs[i].slice(-12).map(e=>{
+      const ptxt = e.pocket==='S'?'Side×2':'Corner×1';
+      return `[${e.t}] ${names[i]}: ${e.ball} / ${ptxt} → +${e.gain}（各相手 ${e.perOpponent}）`;
+    }).join('<br>');
+  }
+}
+
+function renderGames(){
+  const t = document.getElementById('totals');
+  t.innerHTML = '';
+  for(const g of games){
+    const div = document.createElement('div');
+    div.className = 'box';
+    div.innerHTML = `<div><strong>Game ${g.id}</strong> <span class="small">(${g.time})</span></div>
+      <div>${g.names[1]}: <strong>${g.totals[1]}</strong></div>
+      <div>${g.names[2]}: <strong>${g.totals[2]}</strong></div>
+      <div>${g.names[3]}: <strong>${g.totals[3]}</strong></div>
+      <div>${g.names[4]}: <strong>${g.totals[4]}</strong></div>`;
+    t.appendChild(div);
+  }
+  document.getElementById('gamesHint').style.display = games.length? 'none':'block';
+}
+
+// ===== All-time Totals =====
+function computeAllTime(){
+  // Sum totals across all archived games by player name
+  const map = new Map(); // name -> total
+  for(const g of games){
+    for(let i=1;i<=PN;i++){
+      const nm = g.names[i];
+      const val = g.totals[i] || 0;
+      map.set(nm, (map.get(nm)||0) + val);
+    }
+  }
+  // return sorted array of {name, total}
+  return Array.from(map.entries()).map(([name,total])=>({name,total}))
+    .sort((a,b)=> b.total - a.total);
+}
+
+function renderAllTime(){
+  const data = computeAllTime();
+  const wrap = document.getElementById('alltime');
+  wrap.innerHTML = '';
+  if(data.length===0){
+    wrap.innerHTML = '<div class="small">（まだゲームが確定していません）</div>';
+    return;
+  }
+  data.forEach((row, idx)=>{
+    const card = document.createElement('div');
+    card.className = 'rankcard';
+    const cls = row.total>=0 ? 'pos' : 'neg';
+    card.innerHTML = `<div class="rankbadge">#${idx+1}</div>
+      <div class="name">${row.name}</div>
+      <div class="score ${cls}">${row.total}</div>
+      <div class="small">通算ポイント</div>`;
+    wrap.appendChild(card);
+  });
+}
+
+// Wire buttons
+addEventListener('DOMContentLoaded', ()=>{
+  init();
+  document.getElementById('undo').onclick = undo;
+  document.getElementById('reset').onclick = resetGame;
+  document.getElementById('endgame').onclick = endGame;
+  document.getElementById('exportCSV').onclick = exportCSV;
+  document.getElementById('print').onclick = ()=>window.print();
+  renderAllTime();
+});
+</script>
+</body>
+</html>

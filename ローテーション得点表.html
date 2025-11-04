@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ビリヤード｜ローテーション得点計算表（オフライン）</title>
+<style>
+  :root{
+    --bg:#0b0f17; --card:#121a25; --ink:#e9f2ff; --sub:#b7c7df;
+    --acc:#ffd54f; --green:#9cffac; --blue:#90caf9; --red:#ff8a8a;
+  }
+  *{box-sizing:border-box}
+  body{ margin:0; background:radial-gradient(1100px 700px at 70% -10%, #111a30 0%, var(--bg) 60%),
+                 radial-gradient(1100px 700px at -10% 120%, #0c1422 0%, var(--bg) 60%);
+        color:var(--ink); font-family: "Segoe UI","Hiragino Kaku Gothic ProN","Meiryo",system-ui,sans-serif; }
+  header{ padding:20px 14px 8px; text-align:center }
+  h1{ margin:0; font-size:24px; color:var(--acc) }
+  .lead{ margin:6px 0 0; color:var(--sub); font-size:14px }
+  .wrap{ max-width:1000px; margin:14px auto 30px; padding:0 14px; display:grid; gap:14px;
+         grid-template-columns: 1.2fr .8fr; }
+  @media (max-width:900px){ .wrap{ grid-template-columns:1fr } }
+  .card{ background:linear-gradient(180deg, var(--card), #0e1624); border:1px solid rgba(255,255,255,.06);
+         border-radius:14px; padding:14px; box-shadow:0 10px 28px rgba(0,0,0,.35); }
+  h2{ margin:4px 0 10px; color:var(--blue); font-size:18px }
+  .players{ display:flex; gap:8px; flex-wrap:wrap }
+  .pill{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px;
+         border:1px solid rgba(255,255,255,.12); border-radius:999px; cursor:pointer; background:#0f1a2a }
+  .pill input{ accent-color: var(--acc) }
+  .scoreboard{ display:grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap:10px; margin-top:10px }
+  .panel{ background:#0e1624; border:1px solid rgba(255,255,255,.06); border-radius:12px; padding:10px }
+  .panel h3{ margin:0 0 6px; font-size:16px }
+  .big{ font-size:28px; color:var(--green); text-shadow:0 0 16px rgba(156,255,172,.25) }
+  .muted{ color:#9fb0c8; font-size:12px }
+  .balls{ display:grid; grid-template-columns: repeat(8, 1fr); gap:8px }
+  .ball{ aspect-ratio:1; border-radius:50%; display:flex; align-items:center; justify-content:center;
+         font-weight:700; cursor:pointer; user-select:none; border:2px solid transparent; }
+  .ball[data-state="free"]{ border-color:rgba(255,255,255,.12) }
+  .ball[data-state="p1"]{ border-color:#64ffda; box-shadow:0 0 18px rgba(100,255,218,.3) }
+  .ball[data-state="p2"]{ border-color:#ffd54f; box-shadow:0 0 18px rgba(255,213,79,.3) }
+  .ball[data-state="p3"]{ border-color:#ff9ad9; box-shadow:0 0 18px rgba(255,154,217,.3) }
+  .ball[data-state="p4"]{ border-color:#90caf9; box-shadow:0 0 18px rgba(144,202,249,.3) }
+  .tools{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px }
+  button{ padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#12243a;
+          color:var(--ink); cursor:pointer; font-weight:600 }
+  button:hover{ background:#18334f }
+  .danger{ background:#3a1212; border-color:#441a1a }
+  .danger:hover{ background:#521919 }
+  .nums{ display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; color:#cfe0ff; font-size:14px }
+  .kpi{ display:grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap:8px; margin-top:8px }
+  .kpi .cell{ background:#0e1624; padding:8px 10px; border-radius:10px; border:1px solid rgba(255,255,255,.06) }
+  .cell strong{ color:var(--acc) }
+  footer{ max-width:1000px; margin:0 auto 24px; padding:0 14px; color:#9fb0c8; font-size:12px }
+</style>
+</head>
+<body>
+<header>
+  <h1>ビリヤード｜ローテーション得点計算表</h1>
+  <p class="lead">1〜15番の合計は120点。クリックでボールを各プレイヤーに割り当てるだけ。<br>（2人戦は <strong>61点以上で勝利</strong>の目安）</p>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>ボール割り当て 🎱（クリック）</h2>
+    <div class="players">
+      <label class="pill"><input type="radio" name="who" value="p1" checked> P1</label>
+      <label class="pill"><input type="radio" name="who" value="p2"> P2</label>
+      <label class="pill"><input type="radio" name="who" value="p3"> P3</label>
+      <label class="pill"><input type="radio" name="who" value="p4"> P4</label>
+    </div>
+    <div class="balls" id="balls"></div>
+    <div class="tools">
+      <button id="undo">ひとつ戻す</button>
+      <button id="clear">リセット</button>
+      <button id="swap">P1↔P2 入替</button>
+      <button id="print">印刷（PDF）</button>
+    </div>
+    <div class="kpi">
+      <div class="cell">残り点：<strong id="remain">120</strong></div>
+      <div class="cell">P1 勝利ライン（2人戦目安）：<strong>61</strong></div>
+      <div class="cell">履歴：<span id="hist" class="muted">—</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>得点表 📊</h2>
+    <div class="scoreboard" id="score"></div>
+    <div class="nums" id="lists"></div>
+    <details style="margin-top:10px">
+      <summary>ルール備考（簡易）</summary>
+      <ul>
+        <li>各ボールは番号＝点数。例：7番は7点。</li>
+        <li>合計120点。2人戦では先に61点に到達した方の勝ち（一般的な目安）。</li>
+        <li>ファウル、フリーボール等は**手入力で調整**（下の＋/−で加点・減点）。</li>
+      </ul>
+    </details>
+  </div>
+</div>
+
+<footer>
+  使い方：プレイヤーを選び、ボールをクリックして割当。もう一度クリックで解除。<br>
+  スマホ・PC対応／オフライン動作。結果は印刷でPDF保存できます。
+</footer>
+
+<script>
+const ballColors = {
+  1:'#f7d54a', 2:'#3cb4ff', 3:'#ff6b6b', 4:'#b87aff', 5:'#ff9c43',
+  6:'#29d498', 7:'#b4583c', 8:'#555555', 9:'#f7d54a',10:'#3cb4ff',
+ 11:'#ff6b6b',12:'#b87aff',13:'#ff9c43',14:'#29d498',15:'#b4583c'
+};
+
+const state = {
+  players:['p1','p2','p3','p4'],
+  names: {p1:'P1', p2:'P2', p3:'P3', p4:'P4'},
+  assigns: {}, // ball -> pX | 'free'
+  history: [], // {ball, from, to}
+  scores: {p1:0,p2:0,p3:0,p4:0}
+};
+
+function init(){
+  const balls = document.getElementById('balls');
+  for(let n=1;n<=15;n++){
+    const d = document.createElement('div');
+    d.className = 'ball'; d.dataset.n = n; d.dataset.state='free';
+    d.style.background = ballColors[n];
+    d.textContent = n;
+    d.onclick = ()=> toggleAssign(n);
+    balls.appendChild(d);
+    state.assigns[n] = 'free';
+  }
+  render();
+}
+init();
+
+function currentPlayer(){
+  return document.querySelector('input[name="who"]:checked').value;
+}
+
+function toggleAssign(n){
+  const who = currentPlayer();
+  const prev = state.assigns[n];
+  let next = who;
+  if(prev === who){ next = 'free'; } // 同じ人で再クリック→解除
+  state.assigns[n] = next;
+  state.history.push({ball:n, from:prev, to:next});
+  recalc();
+  render();
+}
+
+function recalc(){
+  state.scores = {p1:0,p2:0,p3:0,p4:0};
+  let remain = 120;
+  for(let n=1;n<=15;n++){
+    const owner = state.assigns[n];
+    if(owner !== 'free'){
+      state.scores[owner] += n;
+      remain -= n;
+    }
+  }
+  document.getElementById('remain').textContent = remain;
+}
+
+function render(){
+  // balls UI
+  document.querySelectorAll('.ball').forEach(b=>{
+    const n = parseInt(b.dataset.n);
+    const owner = state.assigns[n];
+    b.dataset.state = owner;
+    b.style.filter = owner==='free' ? 'brightness(0.95)' : 'brightness(1.05)';
+    b.style.opacity = owner==='free' ? 1 : 1;
+  });
+
+  // scores
+  const s = state.scores;
+  const scoreDiv = document.getElementById('score');
+  scoreDiv.innerHTML = '';
+  const players = state.players;
+  players.forEach(pid => {
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.innerHTML = `<h3>${state.names[pid]}</h3>
+      <div class="big">${s[pid]}</div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button data-d="${pid}" data-op="+">＋1</button>
+        <button data-d="${pid}" data-op="-">−1</button>
+      </div>`;
+    scoreDiv.appendChild(panel);
+  });
+  // +/- buttons
+  scoreDiv.querySelectorAll('button').forEach(btn=>{
+    btn.onclick = ()=>{
+      const pid = btn.dataset.d, op = btn.dataset.op;
+      state.scores[pid] += (op==="+") ? 1 : -1;
+      if(state.scores[pid] < 0) state.scores[pid] = 0;
+      // no change to assignments; KPI remain recompute:
+      let sumAssigned = 0;
+      for(let n=1;n<=15;n++){ if(state.assigns[n] !== 'free') sumAssigned += n; }
+      const manualSum = state.scores.p1 + state.scores.p2 + state.scores.p3 + state.scores.p4;
+      const remain = 120 - sumAssigned - (manualSum - sumAssigned);
+      document.getElementById('remain').textContent = Math.max(0, remain);
+      render(); // re-render numbers
+    };
+  });
+
+  // ball lists per player
+  const lists = document.getElementById('lists');
+  lists.innerHTML = '';
+  state.players.forEach(pid=>{
+    const owned = [];
+    for(let n=1;n<=15;n++) if(state.assigns[n]===pid) owned.push(n);
+    const div = document.createElement('div');
+    div.innerHTML = `<strong>${state.names[pid]}:</strong> [ ${owned.join(', ')||'—'} ]`;
+    lists.appendChild(div);
+  });
+
+  // history text
+  const hist = document.getElementById('hist');
+  const h = state.history.slice(-8).map(x=>`${x.ball}:${short(x.from)}→${short(x.to)}`);
+  hist.textContent = h.join(' , ') || '—';
+}
+
+function short(s){ return s==='free'?'–':s.toUpperCase(); }
+
+document.getElementById('undo').onclick = ()=>{
+  const last = state.history.pop();
+  if(!last) return;
+  state.assigns[last.ball] = last.from;
+  recalc(); render();
+};
+document.getElementById('clear').onclick = ()=>{
+  for(let n=1;n<=15;n++){ state.assigns[n] = 'free'; }
+  state.history = [];
+  recalc(); render();
+};
+document.getElementById('swap').onclick = ()=>{
+  // swap P1 and P2 assignment and names
+  for(let n=1;n<=15;n++){
+    if(state.assigns[n]==='p1') state.assigns[n]='p2';
+    else if(state.assigns[n]==='p2') state.assigns[n]='p1';
+  }
+  const tmp = state.scores.p1; state.scores.p1 = state.scores.p2; state.scores.p2 = tmp;
+  recalc(); render();
+};
+document.getElementById('print').onclick = ()=>window.print();
+</script>
+</body>
+</html>

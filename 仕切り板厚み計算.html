@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仕切り板 厚みカリキュレーター（かわいい版）</title>
+<style>
+  :root{
+    --bg:#0b1018; --card:#121a26; --ink:#eaf3ff;
+    --sub:#b9c7db; --acc:#ffd54f; --blue:#8ecbff; --pink:#ff9ad9; --mint:#98ffcc;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100vh; color:var(--ink); background:
+      radial-gradient(1200px 800px at 70% -10%, #101a2a 0%, var(--bg) 60%),
+      radial-gradient(1200px 800px at -10% 120%, #0b1420 0%, var(--bg) 60%);
+    font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", "Meiryo", system-ui, sans-serif;
+  }
+  header{
+    padding:24px 16px 8px; text-align:center;
+  }
+  h1{ margin:0; font-size:28px; color:var(--acc); letter-spacing:.02em }
+  p.lead{ margin:.4em 0 0; color:var(--sub) }
+  .wrap{
+    max-width:980px; margin:16px auto 32px; padding:16px;
+    display:grid; gap:16px; grid-template-columns: 1.1fr .9fr;
+  }
+  @media (max-width:900px){ .wrap{ grid-template-columns: 1fr; } }
+  .card{
+    background:linear-gradient(180deg, var(--card), #0f1622);
+    border:1px solid rgba(255,255,255,.06);
+    border-radius:16px; padding:18px;
+    box-shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  .card h2{ margin:0 0 10px; font-size:18px; color:var(--blue) }
+  .row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:10px 0 }
+  label{ font-size:13px; color:#cfe0ff }
+  input, select{
+    width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.08);
+    background:#0c1520; color:var(--ink); outline:none; font-size:16px;
+  }
+  .units{ color:#9db3cc; font-size:12px; margin-left:6px }
+  .radio{ display:flex; gap:12px; flex-wrap:wrap; margin-top:6px }
+  .chip{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:8px 10px; border:1px solid rgba(255,255,255,.12);
+    border-radius:999px; cursor:pointer; user-select:none;
+    background:#0d1826;
+  }
+  .chip input{ accent-color:#ffd54f }
+  .result{
+    display:flex; flex-direction:column; gap:10px; margin-top:6px;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  .big{
+    font-size:32px; color:var(--mint); text-shadow:0 0 16px rgba(152,255,204,.3);
+  }
+  .badge{
+    display:inline-block; padding:2px 8px; border-radius:999px;
+    background:#122235; color:#b7d4ff; font-size:12px; border:1px solid rgba(255,255,255,.08);
+  }
+  .btns{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px }
+  button{
+    padding:10px 14px; border-radius:12px; border:1px solid rgba(255,255,255,.12);
+    background:#132235; color:var(--ink); cursor:pointer; font-weight:600;
+  }
+  button:hover{ background:#182c49 }
+  details{
+    margin-top:10px; color:#c7d6ef
+  }
+  code{ background:#0e1928; padding:2px 6px; border-radius:6px; }
+  footer{
+    max-width:980px; margin:8px auto 40px; padding:0 16px; color:#9bb1cc; font-size:12px;
+  }
+  .hint{ color:#9bb1cc; font-size:12px }
+</style>
+</head>
+<body>
+<header>
+  <h1>🛠️ 仕切り板 厚みカリキュレーター <span class="badge">参考用</span></h1>
+  <p class="lead">配管耐圧試験の「ブラインド（仕切り板）」の板厚を、薄板円板理論でざっくり試算します。<br>規格（ASME B16.48 / JIS など）の表値や設計審査の代わりにはならない点に注意してください。</p>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>入力 🧮</h2>
+    <div class="row">
+      <div>
+        <label>試験圧力 P <span class="units">[MPa = N/mm²]</span></label>
+        <input id="P" type="number" step="0.01" value="1.50">
+      </div>
+      <div>
+        <label>有効径 D<sub>e</sub>（ガスケット線間の実効直径）<span class="units">[mm]</span></label>
+        <input id="De" type="number" step="1" value="150">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>許容応力 S<sub>a</sub>（試験時の許容）<span class="units">[MPa]</span></label>
+        <input id="Sa" type="number" step="1" value="120">
+      </div>
+      <div>
+        <label>ポアソン比 ν <span class="units">[-]</span></label>
+        <input id="nu" type="number" step="0.01" value="0.30">
+      </div>
+    </div>
+
+    <label>縁条件（円板の固定度）</label>
+    <div class="radio">
+      <label class="chip"><input type="radio" name="edge" value="clamped" checked> 固定端（クランプ：ボルト群でがっちり固定）</label>
+      <label class="chip"><input type="radio" name="edge" value="simply"> 単純支持（周縁が載っているだけ）</label>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>安全率 γ <span class="units">[-]</span></label>
+        <input id="gamma" type="number" step="0.05" value="1.25">
+      </div>
+      <div>
+        <label>最小板厚の丸め <span class="units">[mm刻み]</span></label>
+        <select id="roundStep">
+          <option value="0.1">0.1</option>
+          <option value="0.5" selected>0.5</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="btns">
+      <button id="btnCalc">計算する</button>
+      <button id="btnReset">リセット</button>
+      <button id="btnPrint">PDFに保存（印刷）</button>
+    </div>
+
+    <details>
+      <summary>使い方と注意事項</summary>
+      <ul>
+        <li>有効径 D<sub>e</sub> は<strong>ガスケット反力線（線座標）間の内径</strong>を想定します。迷う場合はガスケット内径を保守的に採用。</li>
+        <li>許容応力 S<sub>a</sub> は試験温度での材料許容。STPA25などはメーカー資料/規格の値を入れてください。</li>
+        <li>この式は薄板円板の<strong>曲げ応力主導</strong>の簡易式で、たわみ・ガスケット座屈・座屈/座金・補強パッド等は未考慮です。</li>
+        <li>最終設計は必ず現行規格（ASME / JIS / 社内基準）と実機条件で確認してください。</li>
+      </ul>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>結果 ✨</h2>
+    <div class="result">
+      <div>算定式：<code>t = a · √( C · P / S<sub>a</sub> ) · γ</code></div>
+      <div class="hint">ここで <code>a = D<sub>e</sub>/2</code>（有効半径），<code>C</code> は縁条件係数</div>
+      <div id="coef" class="hint">C（固定端）= 3(1+ν)/8</div>
+      <div class="big"><span id="tmin">–</span> <span class="units">mm（丸め後）</span></div>
+      <div>理論最小：<span id="tlin">–</span> mm（丸め前）</div>
+      <div>入力の要約：P=<span id="oP"></span> MPa, D<sub>e</sub>=<span id="oDe"></span> mm, S<sub>a</sub>=<span id="oSa"></span> MPa, ν=<span id="onu"></span></div>
+    </div>
+
+    <details>
+      <summary>式の由来（薄板円板の最大曲げ応力）</summary>
+      <p>一様圧力 <code>P</code> を受ける半径 <code>a</code> の薄板円板で、</p>
+      <ul>
+        <li><strong>固定端（clamped）</strong>：<code>σ<sub>max</sub> = [3(1+ν)/8] · (P a² / t²)</code></li>
+        <li><strong>単純支持（simply supported）</strong>：<code>σ<sub>max</sub> = [(3+ν)/8] · (P a² / t²)</code></li>
+      </ul>
+      <p>許容応力 <code>S<sub>a</sub></code> に対して <code>σ<sub>max</sub> ≤ S<sub>a</sub></code> を満たす最小板厚 <code>t</code> を解くと、
+      <code>t = a · √(C·P/S<sub>a</sub>)</code>。安全率 <code>γ</code> を掛けて設計余裕を見込みます。</p>
+      <p class="hint">この近似は一次設計の目安です。規格のブラインド厚（ASME B16.48 など）や座屈・たわみ制限、補強リングの有無、
+      ガスケット座面の剛性などは別途検討が必要です。</p>
+    </details>
+  </div>
+</div>
+
+<footer>
+  参考用ツール：設計・安全審査の代替ではありません。最終判断は現行の規格・社内基準・実機条件に基づき実施してください。
+</footer>
+
+<script>
+const P = document.getElementById('P');
+const De = document.getElementById('De');
+const Sa = document.getElementById('Sa');
+const nu = document.getElementById('nu');
+const gamma = document.getElementById('gamma');
+const roundStep = document.getElementById('roundStep');
+const coef = document.getElementById('coef');
+const tmin = document.getElementById('tmin');
+const tlin = document.getElementById('tlin');
+const oP = document.getElementById('oP');
+const oDe = document.getElementById('oDe');
+const oSa = document.getElementById('oSa');
+const onu = document.getElementById('onu');
+
+function edgeC(){
+  const edge = document.querySelector('input[name="edge"]:checked').value;
+  const v = parseFloat(nu.value||0.3);
+  if(edge==='clamped'){
+    coef.textContent = `C（固定端）= 3(1+ν)/8 = ${(3*(1+v)/8).toFixed(3)}`;
+    return 3*(1+v)/8;
+  }else{
+    coef.textContent = `C（単純支持）= (3+ν)/8 = ${((3+v)/8).toFixed(3)}`;
+    return (3+v)/8;
+  }
+}
+
+function roundTo(value, step){
+  const s = parseFloat(step||"0.5");
+  return Math.ceil(value / s) * s;
+}
+
+function calc(){
+  const p = Math.max(0, parseFloat(P.value||0));
+  const de = Math.max(1e-6, parseFloat(De.value||0));
+  const sa = Math.max(1e-6, parseFloat(Sa.value||0));
+  const g  = Math.max(1, parseFloat(gamma.value||1));
+  const a  = de/2.0;
+  const C  = edgeC();
+  const t_th = a * Math.sqrt(C * p / sa); // mm
+  const t_design = t_th * g;
+  const t_round = roundTo(t_design, roundStep.value);
+
+  tlin.textContent = t_design.toFixed(2);
+  tmin.textContent = t_round.toFixed(2);
+  oP.textContent = p.toFixed(2);
+  oDe.textContent = de.toFixed(0);
+  oSa.textContent = sa.toFixed(0);
+  onu.textContent = (parseFloat(nu.value||0.3)).toFixed(2);
+}
+
+document.getElementById('btnCalc').onclick = calc;
+document.getElementById('btnReset').onclick = ()=>{
+  P.value = 1.50; De.value = 150; Sa.value = 120; nu.value = 0.30; gamma.value = 1.25; roundStep.value = "0.5";
+  document.querySelector('input[name="edge"][value="clamped"]').checked = true;
+  calc();
+};
+document.getElementById('btnPrint').onclick = ()=>window.print();
+document.querySelectorAll('input[name="edge"]').forEach(el=>el.addEventListener('change', calc));
+[P,De,Sa,nu,gamma,roundStep].forEach(el=>el.addEventListener('input', calc));
+
+calc();
+</script>
+</body>
+</html>
