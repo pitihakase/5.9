@@ -1,0 +1,31 @@
+name: Edit file via PR
+on:
+  workflow_dispatch:
+    inputs:
+      path:       { description: "編集/作成するファイルパス（例: 5.9/index.html）", required: true }
+      message:    { description: "コミットメッセージ", required: true, default: "chore: edit via workflow" }
+      content:    { description: "ファイル中身（そのまま貼る）", required: true }
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  edit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply content
+        run: |
+          mkdir -p "$(dirname "${{ inputs.path }}")"
+          printf '%s' "${{ inputs.content }}" > "${{ inputs.path }}"
+          git config user.name  "gh-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout -b "edit-${{ github.run_id }}"
+          git add "${{ inputs.path }}"
+          git commit -m "${{ inputs.message }}"
+      - name: Open PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: "edit-${{ github.run_id }}"
+          title: "${{ inputs.message }}"
+          body: "Automated PR for `${{ inputs.path }}`"
